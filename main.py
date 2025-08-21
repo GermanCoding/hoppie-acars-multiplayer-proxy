@@ -123,7 +123,6 @@ def send_upstream(callsign_from: str | None, callsign_to: str | None, packet: st
     """
     Send a message to upstream.
     """
-    clean_send_messages()
     params = {
         "logon": MAIN_LOGON,
         "from": callsign_from,
@@ -161,7 +160,8 @@ def handle_poll(callsign: str, logon: str) -> PlainTextResponse:
     except HTTPException as e:
         return response(f"error {{{e.detail}}}")
     
-def handle_cpdlc(logon: str, callsign_from: str, callsign_to: str, packet: str, packet_type: str) -> PlainTextResponse:
+def handle_telex_cpdlc(logon: str, callsign_from: str, callsign_to: str, packet: str, packet_type: str) -> PlainTextResponse:
+    clean_send_messages()
     for previous_message in SEND_MESSAGES:
         if (previous_message.from_callsign == callsign_from and previous_message.to_callsign == callsign_to and
             previous_message.payload == packet):
@@ -220,9 +220,9 @@ def connect(
                 if not from_callsign:
                     return response("error {from callsign required for polling}")
                 return handle_poll(from_callsign, logon)
-            case "cpdlc":
+            case "cpdlc" | "telex":
                 if not from_callsign or not to_callsign or not packet:
-                    return response("error {from/to callsigns and packet payload required for sending cpdlc}")
-                return handle_cpdlc(logon, from_callsign, to_callsign, packet, msg_type)
+                    return response("error {from/to callsigns and packet payload required for sending cpdlc/telex}")
+                return handle_telex_cpdlc(logon, from_callsign, to_callsign, packet, msg_type)
             case _:
                 return handle_fallback(from_callsign, to_callsign, packet, msg_type)
