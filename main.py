@@ -103,6 +103,7 @@ def poll_upstream(callsign: str):
                                 current_message = ""
                     return messages
                 messages = extract_messages(text)
+                print(f"Debug: Poll upstream for {callsign} returned {len(messages)} messages")
             else:
                 raise HTTPException(status_code=502, detail=f"Unexpected response: {text}")
             
@@ -141,24 +142,29 @@ def send_upstream(callsign_from: str | None, callsign_to: str | None, packet: st
 
 def handle_poll(callsign: str, logon: str) -> PlainTextResponse:
     try:
-        try:
-            if callsign not in RECEIVED_MESSAGES:
-                poll_upstream(callsign)
-            elif is_poll_needed(RECEIVED_MESSAGES[callsign].last_poll):
-                poll_upstream(callsign)
-        except HoppieError as e:
-            return response(e.error_text)
-
-        messages = [msg for msg in RECEIVED_MESSAGES[callsign].messages if logon not in msg.seen_logons]
-        for msg in messages:
-            msg.seen_logons.add(logon)
-
-        if not messages:
-            return response("ok")
-        else:
-            return response("ok " + " ".join(msg.data for msg in messages) + " ")
+        poll_needed = callsign not in RECEIVED_MESSAGES or is_poll_needed(RECEIVED_MESSAGES[callsign].last_poll)
+        if poll_needed:
+            poll_upstream(callsign)
+    except HoppieError as e:
+        print(f"Debug: HoppieError during poll: {e}")
+        return response(e.error_text)
     except HTTPException as e:
-        return response(f"error {{{e.detail}}}")
+        print(f"Debug: HTTPException during poll: {e}")
+        return response(f"error {{HTTP error {e.detail}}}")
+
+    if callsign not in RECEIVED_MESSAGES:
+        print(f"Debug: No messages for callsign {callsign} despite attempting a poll")
+        return response("ok")
+
+    messages = [msg for msg in RECEIVED_MESSAGES[callsign].messages if logon not in msg.seen_logons]
+    for msg in messages:
+        msg.seen_logons.add(logon)
+        print(f"Debug: Message {msg.data} for callsign {callsign} is received by {msg.seen_logons}")
+
+    if not messages:
+        return response("ok")
+    else:
+        return response("ok " + " ".join(msg.data for msg in messages) + " ")
     
 def handle_telex_cpdlc(logon: str, callsign_from: str, callsign_to: str, packet: str, packet_type: str) -> PlainTextResponse:
     clean_send_messages()
