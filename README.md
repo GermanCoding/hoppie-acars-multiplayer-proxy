@@ -8,6 +8,9 @@ In the Hoppie protocol this is not supported, and only one aircraft/PC will get 
 
 The upstream (Hoppie) server used is configurable, so you can run your own network or use a different upstream (e.g. SayIntentions).
 
+> [!IMPORTANT]
+> Several ACARS implementations communicate with hoppie via HTTPS these days. This proxy has zero support for HTTPS. If your aircraft/ACARS client communicates via HTTPS, you must setup a HTTPS-capable (reverse-)proxy by yourself. This server can still provide the Hoppie logic, but you must "bring your own HTTPS".
+
 ## Prerequisites
 
 - Docker
