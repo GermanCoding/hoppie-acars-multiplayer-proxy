@@ -7,6 +7,7 @@ import httpx
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Set, Optional
 from dataclasses import dataclass, field
+from fastapi import Request
 
 app = FastAPI(title="Hoppie ACARS Multiplayer Proxy", version="0.1")
 
@@ -197,13 +198,46 @@ def handle_fallback(callsign_from: str | None, callsign_to: str | None, packet: 
     return response(send_upstream(callsign_from, callsign_to, packet, packet_type))
 
 @app.api_route("/acars/system/connect.html", methods=["GET", "POST"])
-def connect(
+async def connect(
+    request: Request,
     logon: str | None = Query(None, alias="logon"),
     from_callsign: str | None = Query(None, alias="from"),
     to_callsign: str | None  = Query(None, alias="to"),
     msg_type: str | None = Query(None, alias="type"),
     packet: str | None = Query(None, alias="packet")
 ):
+    # Allow parameters to be supplied via query OR request body (JSON or form)
+    body_params = {}
+    if request.method == "POST":
+        try:
+            ct = request.headers.get("content-type", "")
+            if ct.startswith("application/json"):
+                body = await request.json()
+                if isinstance(body, dict):
+                    body_params = body
+            else:
+                form = await request.form()
+                body_params = {k: v for k, v in form.items()}
+        except Exception:
+            # best-effort fallback to form parsing
+            try:
+                form = await request.form()
+                body_params = {k: v for k, v in form.items()}
+            except Exception:
+                body_params = {}
+
+    # If a value exists in the body, prefer it over the query param
+    if "logon" in body_params:
+        logon = str(body_params.get("logon"))
+    if "from" in body_params:
+        from_callsign = str(body_params.get("from"))
+    if "to" in body_params:
+        to_callsign = str(body_params.get("to"))
+    if "type" in body_params:
+        msg_type = str(body_params.get("type"))
+    if "packet" in body_params:
+        packet = str(body_params.get("packet"))
+
     with MESSAGE_LOCK:
         print(f"Got request with logon={logon} from={from_callsign} to={to_callsign} type={msg_type} packet={packet}")
 
